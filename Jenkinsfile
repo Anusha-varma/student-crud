@@ -1,6 +1,5 @@
 pipeline {
   agent any
-
   environment {
     NODE_ENV = 'test'
   }
@@ -14,29 +13,46 @@ pipeline {
 
     stage('Install') {
       steps {
-        sh 'npm ci'
-      }
-    }
-
-    stage('Build') {
-      steps {
-        // if you have a build step (e.g., transpile), put it here. otherwise this can be a no-op.
-        echo 'No build step for this simple app'
+        script {
+          if (isUnix()) {
+            sh '''
+              node --version
+              npm --version
+              npm ci
+            '''
+          } else {
+            // Windows (cmd)
+            bat '''
+              node --version
+              npm --version
+              npm ci
+            '''
+          }
+        }
       }
     }
 
     stage('Test') {
       steps {
-        // Ensure reports dir exists
-        sh 'mkdir -p reports'
-        // Run tests (jest configured to write reports/junit.xml)
-        sh 'npm test'
+        script {
+          if (isUnix()) {
+            sh '''
+              mkdir -p reports
+              npm test
+            '''
+          } else {
+            // Windows (cmd) - create folder if not exists, then run tests
+            bat '''
+              if not exist reports mkdir reports
+              npm test
+            '''
+          }
+        }
       }
     }
 
     stage('Archive') {
       steps {
-        // archive the test reports and optionally the app (e.g., zipped)
         archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
       }
     }
@@ -44,19 +60,9 @@ pipeline {
 
   post {
     always {
-      // Publish JUnit test results to Jenkins (this will show test stats in the UI)
-      junit allowEmptyResults: false, testResults: 'reports/junit.xml'
-
-      // Optional: clean workspace
+      // publish test results (jenkins expects junit xml)
+      junit 'reports/junit.xml'
       cleanWs()
-    }
-
-    success {
-      echo 'Pipeline succeeded!'
-    }
-
-    failure {
-      echo 'Pipeline failed!'
     }
   }
 }
