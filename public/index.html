@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Students CRUD</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    td, th { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    input { padding: 6px; margin-right: 6px; }
+    button { padding: 6px 10px; margin-right: 6px; }
+    .row-actions button { margin-right: 4px; }
+    .form-inline { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h2>Students</h2>
+
+  <div class="form-inline">
+    <input id="name" placeholder="Name" />
+    <input id="email" placeholder="Email" />
+    <input id="age" placeholder="Age" type="number" style="width:80px" />
+    <button id="addBtn">Add Student</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <table id="studentsTable">
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Actions</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const api = (path, opts) => fetch(path, opts).then(r => r.json());
+
+    async function loadStudents() {
+      const rows = await api('/students');
+      const tbody = document.querySelector('#studentsTable tbody');
+      tbody.innerHTML = '';
+      rows.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${s.id}</td>
+          <td><input data-id="${s.id}" class="inp-name" value="${escapeHtml(s.name)}"></td>
+          <td><input data-id="${s.id}" class="inp-email" value="${escapeHtml(s.email||'')}"></td>
+          <td><input data-id="${s.id}" class="inp-age" type="number" value="${s.age ?? ''}" style="width:70px"></td>
+          <td class="row-actions">
+            <button data-id="${s.id}" class="save">Save</button>
+            <button data-id="${s.id}" class="delete">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      attachRowHandlers();
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    function attachRowHandlers() {
+      document.querySelectorAll('.save').forEach(b => {
+        b.onclick = async () => {
+          const id = b.dataset.id;
+          const name = document.querySelector(`.inp-name[data-id="${id}"]`).value.trim();
+          const email = document.querySelector(`.inp-email[data-id="${id}"]`).value.trim();
+          const ageVal = document.querySelector(`.inp-age[data-id="${id}"]`).value;
+          const age = ageVal === '' ? null : Number(ageVal);
+          await fetch(`/students/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ name, email, age })
+          });
+          await loadStudents();
+        };
+      });
+      document.querySelectorAll('.delete').forEach(b => {
+        b.onclick = async () => {
+          if(!confirm('Delete this student?')) return;
+          await fetch(`/students/${b.dataset.id}`, { method: 'DELETE' });
+          await loadStudents();
+        };
+      });
+    }
+
+    document.getElementById('addBtn').onclick = async () => {
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const ageVal = document.getElementById('age').value;
+      if (!name) { alert('Name required'); return; }
+      const body = { name, email, age: ageVal === '' ? null : Number(ageVal) };
+      await fetch('/students', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('age').value = '';
+      await loadStudents();
+    };
+
+    document.getElementById('clearBtn').onclick = () => {
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('age').value = '';
+    };
+
+    // initial load
+    loadStudents();
+  </script>
+</body>
+</html>
